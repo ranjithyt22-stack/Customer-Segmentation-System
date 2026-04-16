@@ -114,9 +114,10 @@ Open: `http://127.0.0.1:5000`
 
 | Name      | Roll Number / ID | Role / Contribution         |
 |-----------|------------------|----------------------------|
-| Member 1  | XXXXX            | Data processing, ML models |
-| Member 2  | XXXXX            | Dashboard, DL integration  |
-| Member 3  | XXXXX            | Documentation, testing     |
+| Member 1  | 24bcs214            | Data processing, ML models |
+| Member 2  | 24bcs215          | Dashboard, DL integration  |
+| Member 3  | 24bcs220          | Documentation, testing     |
+| Member 4  | 24bcs222         | Data processing, ML models |
 
 ## 11. Project Structure
 
