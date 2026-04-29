@@ -730,5 +730,5 @@ def print_model_metrics():
     print("Inertia:", cluster_model.inertia_)
     print("Cluster Distribution:", pd.Series(clusters).value_counts().to_dict())
 
-if __name__ == "__main__":
-    app.run(debug=True, use_reloader=True)
+'''if __name__ == "__main__":
+    app.run(debug=True, use_reloader=True)'''
