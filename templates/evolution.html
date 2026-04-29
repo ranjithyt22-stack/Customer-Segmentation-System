@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SegmentIQ — Customer Evolution</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .evo-wrapper {
+            max-width: 1000px;
+            margin: 40px auto;
+            position: relative;
+            z-index: 10;
+        }
+        .evo-header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeIn 1s ease;
+        }
+        .evo-header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--ci-text);
+            margin-bottom: 10px;
+        }
+        .evo-header p {
+            color: var(--ci-text-secondary);
+            font-size: 16px;
+            letter-spacing: 0.5px;
+        }
+        .evo-input-section {
+            background: var(--ci-surface-solid);
+            padding: 30px;
+            border-radius: var(--ci-radius-lg);
+            box-shadow: var(--ci-shadow-lg);
+            border: 1px solid var(--ci-line);
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            margin-bottom: 40px;
+            animation: slideUp 1s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        @keyframes slideUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .input-group-custom {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .input-group-custom label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--ci-text-secondary);
+        }
+        .input-group-custom input {
+            padding: 15px;
+            border: 1px solid var(--ci-line-strong);
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            background: transparent;
+            font-size: 16px;
+        }
+        .input-group-custom input:focus {
+            outline: none;
+            border-color: var(--ci-accent);
+            box-shadow: 0 0 0 3px var(--ci-accent-soft);
+        }
+        .btn-analyze {
+            background: var(--ci-accent);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all var(--ci-transition);
+            height: 56px;
+        }
+        .btn-analyze:hover {
+            background: var(--ci-accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--ci-accent-glow);
+        }
+        .chart-container {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: var(--ci-radius-lg);
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05);
+            display: none;
+            animation: fadeIn 1s ease forwards;
+            margin-bottom: 30px;
+        }
+        .insight-panel {
+            background: var(--ci-surface-solid);
+            border-left: 4px solid var(--ci-primary);
+            padding: 30px;
+            border-radius: 0 var(--ci-radius) var(--ci-radius) 0;
+            box-shadow: var(--ci-shadow-md);
+            display: none;
+            animation: fadeIn 1s ease forwards;
+            animation-delay: 0.3s;
+            opacity: 0;
+        }
+        .insight-panel h3 {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--ci-primary);
+            margin-bottom: 20px;
+        }
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .insight-item:last-child {
+            margin-bottom: 0;
+        }
+        .insight-icon {
+            color: var(--ci-accent);
+            font-size: 20px;
+            line-height: 1;
+        }
+        .insight-text {
+            font-size: 15px;
+            color: var(--ci-text-secondary);
+            line-height: 1.5;
+        }
+        .insight-text strong {
+            color: var(--ci-text);
+        }
+        
+        .segment-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .badge-low { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+        .badge-medium { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+        .badge-high { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+
+    </style>
+</head>
+<body class="ci-page">
+
+    <!-- Ghost Typography Background -->
+    <div class="ghost-text t1">FASHION</div>
+    <div class="ghost-text t2">ANALYTICS</div>
+    <div class="ghost-text t3">SEGMENT</div>
+
+    <!-- Top Navigation -->
+    <nav class="premium-nav">
+        <a href="/predict" class="logo">
+            <div class="logo-box">IQ</div>
+            <div class="logo-text">
+                <strong>SegmentIQ</strong>
+                <span>Customer Intelligence</span>
+            </div>
+        </a>
+        <div class="nav-links">
+            <a href="/predict">PREDICT</a>
+            <a href="/dashboard">REPORTS</a>
+            <a href="/calculator">CALCULATOR</a>
+            <a href="/evolution" class="active">EVOLUTION</a>
+            <a href="/logout" class="logout-btn"><i class="bi bi-box-arrow-right"></i> LOGOUT</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="evo-wrapper">
+            <div class="evo-header">
+                <h1>Customer Evolution Timeline</h1>
+                <p>Track how customer value and behavior evolve over time</p>
+            </div>
+
+            <div class="evo-input-section">
+                <div class="input-group-custom">
+                    <label>Customer ID</label>
+                    <input type="text" id="customerIdInput" placeholder="e.g. 14592" autocomplete="off">
+                </div>
+                <button class="btn-analyze" onclick="analyzeEvolution()">Analyze Evolution</button>
+            </div>
+
+            <div class="chart-container" id="chartContainer">
+                <canvas id="evolutionChart"></canvas>
+            </div>
+
+            <div class="insight-panel" id="insightPanel">
+                <h3>Evolution Insights</h3>
+                <div id="insightsList">
+                    <!-- Dynamic insights populated here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <button class="dark-toggle theme-toggle" id="dark-toggle" type="button" title="Toggle dark mode"
+        aria-label="Toggle dark mode" aria-pressed="false">
+        <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-icon theme-toggle-sun"><i class="bi bi-sun"></i></span>
+            <span class="theme-toggle-icon theme-toggle-moon"><i class="bi bi-moon-stars"></i></span>
+            <span class="theme-toggle-thumb"></span>
+        </span>
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const darkToggle = document.getElementById('dark-toggle');
+            const stored = localStorage.getItem('ci-dark-mode');
+
+            function setThemeToggleState(isDark) {
+                darkToggle.classList.toggle('is-dark', isDark);
+                darkToggle.setAttribute('aria-pressed', String(isDark));
+            }
+
+            if (stored === 'true') {
+                document.body.classList.add('dark-mode');
+                document.documentElement.classList.add('dark-mode');
+                setThemeToggleState(true);
+            } else {
+                setThemeToggleState(false);
+            }
+
+            darkToggle.addEventListener('click', function () {
+                const isDark = document.body.classList.toggle('dark-mode');
+                document.documentElement.classList.toggle('dark-mode');
+                setThemeToggleState(isDark);
+                localStorage.setItem('ci-dark-mode', isDark);
+            });
+        });
+
+        let evoChart = null;
+
+        // Custom plugin to draw arrows above points when segment improves/drops
+        const arrowPlugin = {
+            id: 'arrowPlugin',
+            afterDatasetsDraw(chart, args, options) {
+                const { ctx, data } = chart;
+                const meta = chart.getDatasetMeta(0);
+                
+                ctx.save();
+                ctx.font = 'bold 16px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                
+                const segments = data.datasets[0].segmentsData;
+                if (!segments) return;
+
+                for (let i = 1; i < meta.data.length; i++) {
+                    const prevSeg = segments[i-1];
+                    const currSeg = segments[i];
+                    
+                    const point = meta.data[i];
+                    
+                    let arrow = '';
+                    let color = '';
+                    
+                    const levels = { 'Low': 1, 'Medium': 2, 'High': 3 };
+                    
+                    if (levels[currSeg] > levels[prevSeg]) {
+                        arrow = '↑';
+                        color = '#10b981'; // green
+                    } else if (levels[currSeg] < levels[prevSeg]) {
+                        arrow = '↓';
+                        color = '#dc2626'; // red
+                    }
+                    
+                    if (arrow) {
+                        ctx.fillStyle = color;
+                        ctx.fillText(arrow, point.x, point.y - 12);
+                    }
+                }
+                ctx.restore();
+            }
+        };
+
+        Chart.register(arrowPlugin);
+
+        async function analyzeEvolution() {
+            const cid = document.getElementById('customerIdInput').value;
+            if (!cid) {
+                alert("Please enter a Customer ID.");
+                return;
+            }
+
+            const btn = document.querySelector('.btn-analyze');
+            const originalText = btn.innerText;
+            btn.innerText = 'Analyzing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/evolution/${cid}`);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    alert(result.error || "Failed to fetch data. Are you sure the ID exists?");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+                
+                const apiData = result.data;
+                
+                if (apiData.length === 0) {
+                    alert("No purchase history found for this customer.");
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const months = [];
+                const dataPoints = [];
+                const segmentPoints = [];
+                const pointColors = [];
+                
+                const getColor = (seg) => {
+                    if (seg === 'Low') return '#dc2626'; // Red
+                    if (seg === 'Medium') return '#d97706'; // Yellow/Orange
+                    return '#10b981'; // Green
+                };
+
+                apiData.forEach(item => {
+                    months.push(item.month);
+                    dataPoints.push(item.clv);
+                    segmentPoints.push(item.segment);
+                    pointColors.push(getColor(item.segment));
+                });
+
+                renderChart(months, dataPoints, segmentPoints, pointColors);
+                generateInsights(dataPoints, segmentPoints);
+                
+                document.getElementById('chartContainer').style.display = 'block';
+                document.getElementById('insightPanel').style.display = 'block';
+            } catch (error) {
+                alert("Error connecting to server.");
+                console.error(error);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function renderChart(labels, data, segments, colors) {
+            const ctx = document.getElementById('evolutionChart').getContext('2d');
+            
+            if (evoChart) {
+                evoChart.destroy();
+            }
+
+            evoChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'CLV (₹)',
+                        data: data,
+                        segmentsData: segments, // custom property for plugin
+                        borderColor: 'rgba(6, 95, 70, 0.4)', // Deep green soft line
+                        borderWidth: 2,
+                        pointBackgroundColor: colors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        tension: 0.4, // smooth curve
+                        fill: true,
+                        backgroundColor: (context) => {
+                            const ctx = context.chart.ctx;
+                            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                            gradient.addColorStop(0, 'rgba(212, 175, 55, 0.2)'); // Gold tint
+                            gradient.addColorStop(1, 'rgba(247, 245, 239, 0)');
+                            return gradient;
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(17, 17, 17, 0.9)',
+                            padding: 12,
+                            titleFont: { family: 'Inter', size: 13 },
+                            bodyFont: { family: 'Inter', size: 14, weight: 'bold' },
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw;
+                                    const seg = segments[context.dataIndex];
+                                    return [
+                                        `CLV: ₹ ${val.toLocaleString()}`,
+                                        `Segment: ${seg}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                font: { family: 'Inter' },
+                                callback: function(value) {
+                                    if(value >= 1000) return '₹' + value/1000 + 'k';
+                                    return '₹' + value;
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { family: 'Inter', weight: '600' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateInsights(data, segments) {
+            const container = document.getElementById('insightsList');
+            container.innerHTML = '';
+            
+            if (data.length === 0) return;
+
+            const startSeg = segments[0];
+            const endSeg = segments[segments.length - 1];
+            const startVal = data[0];
+            const endVal = data[data.length - 1];
+            
+            const growthPct = startVal === 0 ? 100 : Math.round(((endVal - startVal) / startVal) * 100);
+            const duration = data.length;
+
+            let insight1 = '';
+            if (startSeg !== endSeg) {
+                insight1 = `Customer evolved from <span class="segment-badge badge-${startSeg.toLowerCase()}">${startSeg}</span> to <span class="segment-badge badge-${endSeg.toLowerCase()}">${endSeg}</span> Value over ${duration} active months.`;
+            } else {
+                insight1 = `Customer remained in the <span class="segment-badge badge-${startSeg.toLowerCase()}">${startSeg}</span> segment but showed steady engagement across ${duration} months.`;
+            }
+
+            const insight2 = `Lifetime value exponentially increased by <strong>${growthPct}%</strong>, indicating highly successful retention and upselling efforts.`;
+            const insight3 = `Growth velocity peaked as the customer transitioned into the higher segments, driven by consistent purchase frequency.`;
+
+            const insights = [insight1, insight2, insight3];
+
+            insights.forEach((text, idx) => {
+                const div = document.createElement('div');
+                div.className = 'insight-item';
+                div.style.animation = `fadeIn 0.5s ease forwards ${0.5 + (idx * 0.2)}s`;
+                div.style.opacity = '0';
+                
+                div.innerHTML = `
+                    <div class="insight-icon"><i class="bi bi-stars"></i></div>
+                    <div class="insight-text">${text}</div>
+                `;
+                container.appendChild(div);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,235 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Customer Segmentation Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SegmentIQ - Analytics Dashboard</title>
+    <meta name="description"
+        content="Monitor customer mix, engagement trends, and revenue health powered by live RFM analytics.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #e6f0ff, #f9fbff);
-            font-family: "Inter", "Segoe UI", sans-serif;
-        }
-        .container {
-            max-width: 1200px;
-        }
-        .card-soft {
-            border: none;
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-            background: rgba(255,255,255,0.8);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
-            transition: 0.3s ease;
-        }
-        .card-soft:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.12);
-        }
-        .segment-card {
-            border-radius: 1rem;
-            color: #fff;
-            background: linear-gradient(135deg, #34d399, #10b981);
-        }
-        .segment-card.lost {
-            background: linear-gradient(135deg, #f87171, #ef4444);
-        }
-        .segment-card.regular {
-            background: linear-gradient(135deg, #60a5fa, #2563eb);
-        }
-        .segment-card.occasional {
-            background: linear-gradient(135deg, #fbbf24, #f59e42);
-            color: #1e293b;
-        }
-        .segment-card .card-body {
-            padding: 1.5rem;
-        }
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-        .section-title {
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            color: #212529;
-        }
-        .section-title i {
-            color: #4c6ef5;
-        }
-        h1, h5 {
-            font-weight: 600;
-            letter-spacing: 0.3px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-<div class="container-fluid py-4">
-    <div class="dashboard-hero text-center">
-        <p class="text-uppercase text-muted fw-semibold mb-2">Insight Center</p>
-        <h1>Customer Segmentation Dashboard</h1>
-        <p class="mb-0">Monitor customer mix, engagement trends, and revenue health powered by live RFM analytics.</p>
-    </div>
 
-    <div class="container">
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card card-soft h-100">
-                    <div class="card-body">
-                        <p class="stat-label text-muted mb-1">Total Customers</p>
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="text-primary">
-                                <i class="bi bi-people-fill fs-2"></i>
-                            </div>
-                            <span class="stat-value">{{ total_customers }}</span>
-                        </div>
-                    </div>
-                </div>
+<body class="ci-page">
+    <div class="ghost-text t1">FASHION</div>
+    <div class="ghost-text t2">ANALYTICS</div>
+    <div class="ghost-text t3">SEGMENT</div>
+
+    <nav class="premium-nav">
+        <a href="/predict" class="logo">
+            <div class="logo-box">IQ</div>
+            <div class="logo-text">
+                <strong>SegmentIQ</strong>
+                <span>Customer Intelligence</span>
             </div>
+        </a>
+        <div class="nav-links">
+            <a href="/predict">PREDICT</a>
+            <a href="/dashboard" class="active">REPORTS</a>
+            <a href="/calculator">CALCULATOR</a>
+            <a href="/evolution">EVOLUTION</a>
+            <a href="/logout" class="logout-btn"><i class="bi bi-box-arrow-right"></i> LOGOUT</a>
+        </div>
+    </nav>
+
+    <main class="container py-4 py-lg-5 dashboard-page">
+        <div class="ci-eyebrow">Insight Center</div>
+        <div class="dashboard-title-row">
+            <div>
+                <h1 class="ci-main-title">Analytics Dashboard</h1>
+                <p class="dashboard-subtitle">Monitor customer mix, engagement trends, and revenue health powered by
+                    live RFM analytics.</p>
+            </div>
+            <div class="ci-tag dashboard-status">Live RFM</div>
+        </div>
+
+        <section class="dashboard-summary-grid" aria-label="Customer segment summary">
+            <article class="ci-card dashboard-metric-card total-card">
+                <div class="metric-head">
+                    <span class="metric-icon"><i class="bi bi-people-fill"></i></span>
+                    <span class="stat-label">Total Customers</span>
+                </div>
+                <div class="metric-value">{{ total_customers }}</div>
+            </article>
+
             {% set segment_classes = {
-                'High Value Customer': '',
-                'Lost Customer': 'lost',
-                'Regular Customer': 'regular',
-                'Occasional Customer': 'occasional',
-                'Normal Customer': ''
+            'High Value Customer': 'high',
+            'Lost Customer': 'lost',
+            'Regular Customer': 'regular',
+            'Occasional Customer': 'occasional',
+            'Normal Customer': 'normal'
             } %}
             {% set segment_icons = {
-                'High Value Customer': 'bi-trophy-fill',
-                'Lost Customer': 'bi-emoji-frown-fill',
-                'Regular Customer': 'bi-bar-chart-fill',
-                'Normal Customer': 'bi-emoji-neutral-fill',
-                'Occasional Customer': 'bi-stars'
+            'High Value Customer': 'bi-trophy-fill',
+            'Lost Customer': 'bi-emoji-frown-fill',
+            'Regular Customer': 'bi-bar-chart-fill',
+            'Normal Customer': 'bi-emoji-neutral-fill',
+            'Occasional Customer': 'bi-stars'
             } %}
             {% for seg, pct in segment_percentages.items() %}
-            {% set seg_class = segment_classes.get(seg, '') %}
+            {% set seg_class = segment_classes.get(seg, 'normal') %}
             {% set seg_icon = segment_icons.get(seg, 'bi-people') %}
-            <div class="col-md-4 col-lg-3">
-                <div class="card card-soft segment-card h-100 {{ seg_class }}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-semibold">{{ seg }}</span>
-                            <i class="segment-icon bi {{ seg_icon }}"></i>
-                        </div>
-                        <p class="stat-value mb-0">{{ pct }}<span class="fs-5">%</span></p>
-                    </div>
+            <article class="ci-card dashboard-metric-card segment-card {{ seg_class }}">
+                <div class="metric-head">
+                    <span class="metric-icon"><i class="bi {{ seg_icon }}"></i></span>
+                    <span class="stat-label">{{ seg }}</span>
                 </div>
-            </div>
+                <div class="metric-value">{{ pct }}<span>%</span></div>
+            </article>
             {% endfor %}
-        </div>
+        </section>
 
-        <div class="row g-4">
+        <section class="row g-4 dashboard-chart-grid">
             <div class="col-lg-6">
-                <div class="card card-soft chart-card p-3 h-100">
-                    <h5 class="section-title"><i class="bi bi-bullseye"></i>Cluster Scatter Plot</h5>
+                <div class="ci-card chart-card h-100">
+                    <div class="ci-card-label"><i class="bi bi-bullseye"></i> Cluster Scatter Plot</div>
                     {% if interactive %}
-                    <iframe src="/static/cluster_plot_interactive.html" height="400" loading="lazy"></iframe>
+                    <iframe src="/static/cluster_plot_interactive.html" height="420" loading="lazy"
+                        title="Interactive Cluster Plot"></iframe>
                     {% else %}
-                    <img src="/static/cluster_plot.png" alt="Cluster plot" class="img-fluid">
+                    <img src="/static/cluster_plot.png" alt="Customer cluster scatter plot" class="img-fluid">
                     {% endif %}
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="card card-soft chart-card p-3 h-100">
-                    <h5 class="section-title"><i class="bi bi-pie-chart-fill"></i>Segment Distribution</h5>
+                <div class="ci-card chart-card h-100">
+                    <div class="ci-card-label"><i class="bi bi-pie-chart-fill"></i> Segment Distribution</div>
                     {% if interactive %}
-                    <iframe src="/static/segment_pie_interactive.html" height="400" loading="lazy"></iframe>
+                    <iframe src="/static/segment_pie_interactive.html" height="420" loading="lazy"
+                        title="Interactive Segment Pie Chart"></iframe>
                     {% else %}
-                    <img src="/static/segment_pie.png" alt="Segment distribution" class="img-fluid">
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="row g-4 mt-1">
-            <div class="col-lg-6">
-                <div class="card card-soft chart-card p-3 h-100">
-                    <h5 class="section-title"><i class="bi bi-cash-coin"></i>Average Spending per Segment</h5>
-                    {% if interactive %}
-                    <iframe src="/static/avg_spending_interactive.html" height="400" loading="lazy"></iframe>
-                    {% else %}
-                    <img src="/static/avg_spending.png" alt="Average spending" class="img-fluid">
+                    <img src="/static/segment_pie.png" alt="Segment distribution pie chart" class="img-fluid">
                     {% endif %}
                 </div>
             </div>
             <div class="col-lg-6">
-                <div class="card card-soft chart-card p-3 h-100">
-                    <h5 class="section-title"><i class="bi bi-diagram-3"></i>Elbow Method (Optimal Clusters)</h5>
-                    <img src="/static/elbow_plot.png" alt="Elbow method" class="img-fluid">
+                <div class="ci-card chart-card h-100">
+                    <div class="ci-card-label"><i class="bi bi-cash-coin"></i> Average Spending per Segment</div>
+                    {% if interactive %}
+                    <iframe src="/static/avg_spending_interactive.html" height="420" loading="lazy"
+                        title="Interactive Average Spending Chart"></iframe>
+                    {% else %}
+                    <img src="/static/avg_spending.png" alt="Average spending per segment bar chart" class="img-fluid">
+                    {% endif %}
                 </div>
             </div>
-        </div>
-
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="info-card p-4 card-soft">
-                    <div class="d-flex align-items-start gap-3">
-                        <i class="bi bi-lightbulb-fill fs-2 text-warning"></i>
-                        <div>
-                            <h5 class="mb-2">Customer Lifetime Value Insight</h5>
-                            <p class="mb-0">CLV is estimated via an RFM-driven regression pipeline. Recency, frequency, and monetary strength feed a predictive model to highlight customers who merit retention budgets, premium offerings, or re-engagement journeys.</p>
-                        </div>
-                    </div>
+            <div class="col-lg-6">
+                <div class="ci-card chart-card h-100">
+                    <div class="ci-card-label"><i class="bi bi-diagram-3"></i> Elbow Method</div>
+                    <img src="/static/elbow_plot.png" alt="Elbow method for optimal cluster selection"
+                        class="img-fluid">
                 </div>
             </div>
-        </div>
-    </div>
-</div>
+        </section>
 
-<!-- ULTRA PREMIUM BACKGROUND SCRIPTS -->
-<canvas id="particle-canvas"></canvas>
-<div class="cursor-glow" id="cursor-glow"></div>
-<button class="dark-toggle" id="dark-toggle" title="Toggle dark mode">🌙</button>
-<script>
-// 1. Animated Particles
-const canvas = document.getElementById('particle-canvas');
-const ctx = canvas.getContext('2d');
-let particles = [];
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-function Particle() {
-    this.x = Math.random() * canvas.width;
-    this.y = Math.random() * canvas.height;
-    this.radius = Math.random() * 2 + 1;
-    this.color = `rgba(${34+Math.floor(Math.random()*40)},${197+Math.floor(Math.random()*30)},${244+Math.floor(Math.random()*10)},0.18)`;
-    this.speedX = (Math.random() - 0.5) * 0.6;
-    this.speedY = (Math.random() - 0.5) * 0.6;
-}
-for(let i=0;i<90;i++) particles.push(new Particle());
-function animateParticles() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    for(let p of particles) {
-        ctx.beginPath();
-        ctx.arc(p.x,p.y,p.radius,0,2*Math.PI);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-        p.x += p.speedX;
-        p.y += p.speedY;
-        if(p.x<0||p.x>canvas.width) p.speedX*=-1;
-        if(p.y<0||p.y>canvas.height) p.speedY*=-1;
-    }
-    requestAnimationFrame(animateParticles);
-}
-animateParticles();
-// 2. Cursor Glow
-const cursorGlow = document.getElementById('cursor-glow');
-document.addEventListener('mousemove', e => {
-    cursorGlow.style.left = e.clientX + 'px';
-    cursorGlow.style.top = e.clientY + 'px';
-});
-// 3. Dark Mode Toggle
-const darkToggle = document.getElementById('dark-toggle');
-darkToggle.addEventListener('click', () => {
-    document.body.classList.toggle('dark-mode');
-    document.documentElement.classList.toggle('dark-mode');
-});
-</script>
-<!-- END ULTRA PREMIUM BACKGROUND SCRIPTS -->
+        <section class="ci-card dashboard-insight-card">
+            <div class="metric-head">
+                <span class="metric-icon insight"><i class="bi bi-lightbulb-fill"></i></span>
+                <span class="stat-label">Customer Lifetime Value Insight</span>
+            </div>
+            <p class="mb-0">CLV is estimated via an RFM-driven regression pipeline. Recency, frequency, and monetary
+                strength feed a predictive model to highlight customers who merit retention budgets, premium offerings,
+                or re-engagement journeys.</p>
+        </section>
+    </main>
+
+    <button class="dark-toggle theme-toggle" id="dark-toggle" type="button" title="Toggle dark mode"
+        aria-label="Toggle dark mode" aria-pressed="false">
+        <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-icon theme-toggle-sun"><i class="bi bi-sun"></i></span>
+            <span class="theme-toggle-icon theme-toggle-moon"><i class="bi bi-moon-stars"></i></span>
+            <span class="theme-toggle-thumb"></span>
+        </span>
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const darkToggle = document.getElementById('dark-toggle');
+            const stored = localStorage.getItem('ci-dark-mode');
+
+            function setThemeToggleState(isDark) {
+                darkToggle.classList.toggle('is-dark', isDark);
+                darkToggle.setAttribute('aria-pressed', String(isDark));
+            }
+
+            if (stored === 'true') {
+                document.body.classList.add('dark-mode');
+                document.documentElement.classList.add('dark-mode');
+                setThemeToggleState(true);
+            } else {
+                setThemeToggleState(false);
+            }
+
+            darkToggle.addEventListener('click', function () {
+                const isDark = document.body.classList.toggle('dark-mode');
+                document.documentElement.classList.toggle('dark-mode');
+                setThemeToggleState(isDark);
+                localStorage.setItem('ci-dark-mode', isDark);
+            });
+        });
+    </script>
 </body>
+
 </html>

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SegmentIQ — CLV Calculator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .calc-wrapper {
+            max-width: 900px;
+            margin: 40px auto;
+        }
+        .calc-header {
+            text-align: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 42px;
+            font-weight: 700;
+            color: var(--ci-text);
+            margin-bottom: 30px;
+        }
+        .calc-card {
+            background: var(--ci-surface-solid);
+            border-radius: var(--ci-radius-lg);
+            padding: 40px;
+            box-shadow: var(--ci-shadow-lg);
+            border: 1px solid var(--ci-line);
+            display: flex;
+            gap: 40px;
+            position: relative;
+            z-index: 10;
+        }
+        .calc-inputs {
+            flex: 1;
+        }
+        .calc-result-box {
+            background: var(--ci-accent-soft);
+            border-radius: var(--ci-radius);
+            padding: 40px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 250px;
+            text-align: center;
+            border: 1px solid rgba(6, 95, 70, 0.15);
+        }
+        .calc-result-box h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--ci-text);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .calc-result-box .value {
+            font-family: 'Inter', sans-serif;
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--ci-accent);
+        }
+        .calc-btn {
+            background: var(--ci-accent);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: var(--ci-radius-sm);
+            width: 100%;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 20px;
+            transition: all var(--ci-transition);
+        }
+        .calc-btn:hover {
+            background: var(--ci-accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--ci-accent-glow);
+        }
+        .form-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--ci-text-secondary);
+            margin-bottom: 6px;
+        }
+        .form-control {
+            border: 1px solid var(--ci-line-strong);
+            background: transparent;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-family: 'Inter', sans-serif;
+        }
+        .form-control:focus {
+            border-color: var(--ci-accent);
+            box-shadow: 0 0 0 3px var(--ci-accent-soft);
+            background: transparent;
+        }
+        .calc-info {
+            text-align: center;
+            margin-top: 50px;
+            padding-bottom: 50px;
+        }
+        .calc-info h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+        }
+        .calc-info p {
+            color: var(--ci-text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+        
+        @media (max-width: 768px) {
+            .calc-card {
+                flex-direction: column;
+            }
+            .calc-result-box {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body class="ci-page">
+
+    <!-- Ghost Typography Background -->
+    <div class="ghost-text t1">FASHION</div>
+    <div class="ghost-text t2">ANALYTICS</div>
+    <div class="ghost-text t3">SEGMENT</div>
+
+    <!-- Top Navigation -->
+    <nav class="premium-nav">
+        <a href="/predict" class="logo">
+            <div class="logo-box">IQ</div>
+            <div class="logo-text">
+                <strong>SegmentIQ</strong>
+                <span>Customer Intelligence</span>
+            </div>
+        </a>
+        <div class="nav-links">
+            <a href="/predict">PREDICT</a>
+            <a href="/dashboard">REPORTS</a>
+            <a href="/calculator" class="active">CALCULATOR</a>
+            <a href="/evolution">EVOLUTION</a>
+            <a href="/logout" class="logout-btn"><i class="bi bi-box-arrow-right"></i> LOGOUT</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="calc-wrapper">
+            <h1 class="calc-header">CLV Calculator</h1>
+            
+            <div class="calc-card">
+                <div class="calc-inputs">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Average No. Of Transactions Per Year *</label>
+                            <input type="number" id="freq" class="form-control" value="34" step="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Average Order Value *</label>
+                            <input type="number" id="aov" class="form-control" value="24432" step="0.01">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Currency</label>
+                            <select id="currency" class="form-select form-control">
+                                <option value="₹">INR (₹)</option>
+                                <option value="$">USD ($)</option>
+                                <option value="€">EUR (€)</option>
+                                <option value="£">GBP (£)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Average Gross Margin (%) *</label>
+                            <input type="number" id="margin" class="form-control" value="23" step="0.1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Average Customer Lifespan (Years) *</label>
+                            <input type="number" id="lifespan" class="form-control" value="22" step="0.1">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Total No. Of Customers For The Period</label>
+                            <input type="number" id="customers" class="form-control" value="21342" step="1">
+                        </div>
+                    </div>
+                    <button class="calc-btn" onclick="calculateCLV()">Calculate</button>
+                </div>
+                
+                <div class="calc-result-box">
+                    <h3>Your CLV</h3>
+                    <div class="value" id="clvResult">₹ 196.95</div>
+                </div>
+            </div>
+
+            <div class="calc-info">
+                <h2>What Is Customer Lifetime Value (CLV)?</h2>
+                <p>CLV is the total revenue a business can earn from a single customer during the course of their relationship. Understanding CLV helps optimize customer acquisition costs and improves long-term profitability.</p>
+            </div>
+        </div>
+    </main>
+
+    <button class="dark-toggle theme-toggle" id="dark-toggle" type="button" title="Toggle dark mode"
+        aria-label="Toggle dark mode" aria-pressed="false">
+        <span class="theme-toggle-track" aria-hidden="true">
+            <span class="theme-toggle-icon theme-toggle-sun"><i class="bi bi-sun"></i></span>
+            <span class="theme-toggle-icon theme-toggle-moon"><i class="bi bi-moon-stars"></i></span>
+            <span class="theme-toggle-thumb"></span>
+        </span>
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const darkToggle = document.getElementById('dark-toggle');
+            const stored = localStorage.getItem('ci-dark-mode');
+
+            function setThemeToggleState(isDark) {
+                darkToggle.classList.toggle('is-dark', isDark);
+                darkToggle.setAttribute('aria-pressed', String(isDark));
+            }
+
+            if (stored === 'true') {
+                document.body.classList.add('dark-mode');
+                document.documentElement.classList.add('dark-mode');
+                setThemeToggleState(true);
+            } else {
+                setThemeToggleState(false);
+            }
+
+            darkToggle.addEventListener('click', function () {
+                const isDark = document.body.classList.toggle('dark-mode');
+                document.documentElement.classList.toggle('dark-mode');
+                setThemeToggleState(isDark);
+                localStorage.setItem('ci-dark-mode', isDark);
+            });
+        });
+
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(2) + 'M';
+            } else if (num >= 1000) {
+                return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return num.toFixed(2);
+        }
+
+        function calculateCLV() {
+            const freq = parseFloat(document.getElementById('freq').value) || 0;
+            const aov = parseFloat(document.getElementById('aov').value) || 0;
+            const margin = parseFloat(document.getElementById('margin').value) || 0;
+            const lifespan = parseFloat(document.getElementById('lifespan').value) || 0;
+            const currency = document.getElementById('currency').value;
+
+            // Simple formula: Average Order Value x Purchase Frequency x Lifespan x (Gross Margin / 100)
+            const clv = aov * freq * lifespan * (margin / 100);
+            
+            document.getElementById('clvResult').innerText = currency + ' ' + formatNumber(clv);
+        }
+    </script>
+    
+</body>
+</html>

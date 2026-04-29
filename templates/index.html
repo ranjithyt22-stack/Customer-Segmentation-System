@@ -2,44 +2,61 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Customer Segmentation System</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>SegmentIQ — Customer Segmentation & CLV Prediction</title>
+	<meta name="description" content="Predict customer segments and lifetime value using AI-powered RFM analytics. SegmentIQ helps textile retailers maximize revenue.">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 	<link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="ci-page">
-<nav class="ci-topbar">
-	<div class="ci-brand-wrap">
-		<div class="ci-brand-icon"><i class="bi bi-layers-fill"></i></div>
-		<div>
-			<div class="ci-brand-title">SegmentIQ</div>
-			<div class="ci-brand-subtitle">Customer Intelligence</div>
-		</div>
-	</div>
-	<div class="ci-top-actions">
-		<a href="/" class="ci-pill ci-pill-active">Predict</a>
-		<a href="/dashboard" class="ci-pill">Reports</a>
-		<a href="/dashboard" class="ci-dashboard-btn"><i class="bi bi-grid-1x2"></i> View Dashboard</a>
-	</div>
-</nav>
 
+	<!-- Ghost Typography Background -->
+	<div class="ghost-text t1 parallax-layer" data-speed="0.02">FASHION</div>
+	<div class="ghost-text t2 parallax-layer" data-speed="0.04">ANALYTICS</div>
+	<div class="ghost-text t3 parallax-layer" data-speed="0.03">SEGMENT</div>
+
+	<!-- Top Navigation -->
+	<nav class="premium-nav parallax-layer" data-speed="0.01">
+		<a href="/predict" class="logo">
+			<div class="logo-box">IQ</div>
+			<div class="logo-text">
+				<strong>SegmentIQ</strong>
+				<span>Customer Intelligence</span>
+			</div>
+		</a>
+		<div class="nav-links">
+			<a href="/predict" class="active">PREDICT</a>
+			<a href="/dashboard">REPORTS</a>
+			<a href="/calculator">CALCULATOR</a>
+			<a href="/evolution">EVOLUTION</a>
+			<a href="/logout" class="logout-btn"><i class="bi bi-box-arrow-right"></i> LOGOUT</a>
+		</div>
+	</nav>
+
+<!-- ── Main Content ────────────────────────────── -->
 <main class="container py-4 py-lg-5">
 	<div class="ci-eyebrow">Customer Intelligence</div>
 	<h1 class="ci-main-title">Customer Segmentation System</h1>
 
 	<div class="row g-4 align-items-start">
+
+		<!-- ── Form Card ────────────────────────── -->
 		<div class="col-xl-8">
 			<div class="ci-card">
 				<div class="ci-card-label">Customer Details</div>
 				<form id="predict-form" action="/predict" method="post" class="ci-form-grid">
+
 					<div class="ci-field ci-field-full">
 						<label for="customer_id" class="form-label">Customer ID <span class="ci-required">*</span></label>
 						<div class="d-flex gap-2">
-							<input type="text" class="form-control" id="customer_id" name="customer_id" placeholder="e.g. CUST-00421" required>
-							<button type="button" class="btn ci-outline-btn" id="fetch-btn">Fetch Details</button>
+							<input type="text" class="form-control" id="customer_id" name="customer_id" placeholder="e.g. 17850" required>
+							<button type="button" class="btn ci-outline-btn" id="fetch-btn">
+								<i class="bi bi-search me-1"></i> Fetch
+							</button>
 						</div>
 					</div>
 
@@ -50,71 +67,115 @@
 
 					<div class="ci-field">
 						<label for="total_purchases" class="form-label">Total Purchases</label>
-						<input type="number" class="form-control" id="total_purchases" name="total_purchases" required>
+						<input type="number" class="form-control" id="total_purchases" name="total_purchases" placeholder="0" required>
 					</div>
 
 					<div class="ci-field">
-						<label for="total_spending" class="form-label">Total Spending ($)</label>
-						<input type="number" class="form-control" id="total_spending" name="total_spending" step="0.01" required>
+						<label for="total_spending" class="form-label">Total Spending (Historical) ($)</label>
+						<input type="number" class="form-control" id="total_spending" name="total_spending" step="0.01" placeholder="0.00" required>
 					</div>
 
 					<div class="ci-field ci-field-full">
-						<button type="submit" class="btn ci-primary-btn w-100">
+						<button type="submit" class="btn ci-primary-btn w-100" id="predict-btn">
 							<i class="bi bi-activity"></i>
 							Predict Customer Segment &amp; CLV
 						</button>
 					</div>
 				</form>
 
+				<!-- Flash messages -->
 				{% with messages = get_flashed_messages() %}
 				{% if messages %}
 				<div class="alert alert-warning mt-3 mb-0" role="alert">
-					{{ messages[-1] }}
+					<i class="bi bi-exclamation-triangle me-1"></i> {{ messages[-1] }}
 				</div>
 				{% endif %}
 				{% endwith %}
 
 				{% if error_message %}
-				<div class="alert alert-danger mt-3 mb-0" role="alert">{{ error_message }}</div>
+				<div class="alert alert-danger mt-3 mb-0" role="alert">
+					<i class="bi bi-x-circle me-1"></i> {{ error_message }}
+				</div>
 				{% endif %}
 
+				<!-- ── Prediction Result ───────────── -->
 				{% if result %}
-				<div class="ci-result-card mt-3">
-					<h5 class="mb-2">Customer Segment: {{ result }}</h5>
+				<div class="ci-result-card mt-4">
+					<div class="d-flex align-items-center gap-3 mb-3">
+						<div style="width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px;" class="{{ segment_theme }}">
+							<i class="bi {{ segment_icon }}"></i>
+						</div>
+						<div>
+							<div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:var(--ci-muted);">Predicted Segment</div>
+							<div style="font-size:20px;font-weight:800;line-height:1.2;">{{ result }}</div>
+						</div>
+					</div>
+
 					{% if model_used %}
-					<p class="mb-2"><strong>Model Used:</strong> {{ model_used }}</p>
+					<div class="d-flex align-items-center gap-2 mb-2" style="font-size:14px;">
+						<i class="bi bi-cpu" style="color:var(--ci-primary);"></i>
+						<span><strong>Model:</strong> {{ model_used }}</span>
+					</div>
 					{% endif %}
-					{% if clv_usd %}
-					<p class="mb-2"><strong>Predicted Lifetime Value:</strong> ${{ "{:,.2f}".format(clv_usd) }} <span class="text-muted">(₹{{ "{:,.0f}".format(clv_inr) }})</span></p>
+
+					{% if total_spending is defined and clv_usd is defined %}
+					<div class="row g-2 mb-3">
+						<div class="col-6">
+							<div class="p-3 rounded" style="background:var(--ci-surface-hover); border:1px solid var(--ci-line);">
+								<div style="font-size:11px;font-weight:700;color:var(--ci-muted);text-transform:uppercase;margin-bottom:4px;">Total Spending (Historical)</div>
+								<div style="font-size:18px;font-weight:800;color:var(--ci-text);">${{ "{:,.2f}".format(total_spending) }}</div>
+							</div>
+						</div>
+						<div class="col-6">
+							<div class="p-3 rounded" style="background:var(--ci-accent-soft); border:1px solid var(--ci-accent); box-shadow:0 0 12px var(--ci-accent-glow);">
+								<div style="font-size:11px;font-weight:800;color:var(--ci-accent);text-transform:uppercase;margin-bottom:4px;">Customer Lifetime Value (Predicted)</div>
+								<div style="font-size:18px;font-weight:800;color:var(--ci-text);">${{ "{:,.2f}".format(clv_usd) }}</div>
+							</div>
+						</div>
+					</div>
 					{% endif %}
+
 					{% if strategy %}
-					<p class="mb-0"><strong>Recommended Strategy:</strong><br>{{ strategy }}</p>
+					<div class="d-flex align-items-start gap-2 mt-2" style="font-size:14px;">
+						<i class="bi bi-lightbulb" style="color:var(--ci-warning);margin-top:2px;"></i>
+						<span><strong>Strategy:</strong> {{ strategy }}</span>
+					</div>
+					{% endif %}
+
+					{% if offer %}
+					<hr style="border-color:var(--ci-line);margin:14px 0;">
+					<div class="d-flex align-items-center gap-2" style="font-size:13px;">
+						<i class="bi bi-gift" style="color:var(--ci-accent);"></i>
+						<span><strong>{{ offer.title }}:</strong> {{ offer.subtitle }}</span>
+						<span class="ci-tag ms-auto">{{ offer.coupon_code }}</span>
+					</div>
 					{% endif %}
 				</div>
 				{% endif %}
 			</div>
 		</div>
 
+		<!-- ── Sidebar ──────────────────────────── -->
 		<div class="col-xl-4">
 			<div class="ci-side-card">
 				<div class="ci-card-label">CLV Model</div>
 				<div class="ci-model-list" role="radiogroup" aria-label="CLV model selection">
-					<label class="ci-model-item {% if model_selected == 'auto' %}active{% endif %}">
+					<label class="ci-model-item {% if model_selected == 'auto' %}active{% endif %}" id="model-auto">
 						<input type="radio" name="model_choice" value="auto" form="predict-form" {% if model_selected == "auto" or not model_selected %}checked{% endif %} hidden>
-						<div class="d-flex justify-content-between align-items-center">
+						<div class="d-flex justify-content-between align-items-center w-100">
 							<span>Auto</span>
 							<span class="ci-tag">Recommended</span>
 						</div>
 					</label>
 
-					<label class="ci-model-item {% if model_selected == 'deep' %}active{% endif %} {% if not deep_clv_available %}disabled{% endif %}" data-value="deep">
+					<label class="ci-model-item {% if model_selected == 'deep' %}active{% endif %} {% if not deep_clv_available %}disabled{% endif %}" id="model-deep" data-value="deep">
 						<input type="radio" name="model_choice" value="deep" form="predict-form" {% if model_selected == "deep" %}checked{% endif %} {% if not deep_clv_available %}disabled{% endif %}>
-						<span>Deep Learning {% if not deep_clv_available %}(Unavailable){% endif %}</span>
+						<span>Deep Learning {% if not deep_clv_available %}<span style="opacity:0.6">(Unavailable)</span>{% endif %}</span>
 					</label>
 
-					<label class="ci-model-item {% if model_selected == 'ml' %}active{% endif %} {% if not ml_clv_available %}disabled{% endif %}" data-value="ml">
+					<label class="ci-model-item {% if model_selected == 'ml' %}active{% endif %} {% if not ml_clv_available %}disabled{% endif %}" id="model-ml" data-value="ml">
 						<input type="radio" name="model_choice" value="ml" form="predict-form" {% if model_selected == "ml" %}checked{% endif %} {% if not ml_clv_available %}disabled{% endif %}>
-						<span>Machine Learning {% if not ml_clv_available %}(Unavailable){% endif %}</span>
+						<span>Machine Learning {% if not ml_clv_available %}<span style="opacity:0.6">(Unavailable)</span>{% endif %}</span>
 					</label>
 				</div>
 				<p class="ci-side-note mb-0">Automatically selects the best available model in Auto mode.</p>
@@ -132,14 +193,37 @@
 					<div class="col-6">
 						<div class="ci-mini-stat">
 							<div class="ci-mini-label">Model</div>
-							<div class="ci-mini-value">{{ 'DL' if model_used and 'Deep' in model_used else 'ML' if model_used else '--' }}</div>
+							<div class="ci-mini-value">{{ 'DL' if model_used and 'Deep' in model_used else 'ML' if model_used else '—' }}</div>
 						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Quick tips -->
+			<div class="ci-side-card mt-3" style="border-left:3px solid var(--ci-accent);">
+				<div class="d-flex align-items-start gap-2">
+					<i class="bi bi-info-circle-fill" style="color:var(--ci-accent);margin-top:2px;"></i>
+					<div style="font-size:13px;color:var(--ci-text-secondary);line-height:1.5;">
+						<strong>Quick start:</strong> Enter a Customer ID and click <em>Fetch</em> to auto-fill purchase history from the dataset.
 					</div>
 				</div>
 			</div>
 		</div>
 	</div>
 </main>
+
+
+
+<!-- ── Dark Mode Toggle ────────────────────────── -->
+<button class="dark-toggle theme-toggle" id="dark-toggle" type="button" title="Toggle dark mode"
+	aria-label="Toggle dark mode" aria-pressed="false">
+	<span class="theme-toggle-track" aria-hidden="true">
+		<span class="theme-toggle-icon theme-toggle-sun"><i class="bi bi-sun"></i></span>
+		<span class="theme-toggle-icon theme-toggle-moon"><i class="bi bi-moon-stars"></i></span>
+		<span class="theme-toggle-thumb"></span>
+	</span>
+</button>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 	const fetchBtn = document.getElementById('fetch-btn');
@@ -149,6 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
 	const totalSpendingInput = document.getElementById('total_spending');
 	const modelItems = document.querySelectorAll('.ci-model-item');
 
+	// Model radio selection
 	modelItems.forEach((item) => {
 		const input = item.querySelector('input[type="radio"]');
 		if (!input || input.disabled) return;
@@ -162,6 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
 		}
 	});
 
+	// Fetch customer details
 	if (fetchBtn) {
 		fetchBtn.addEventListener('click', async function () {
 			const customerId = customerInput.value.trim();
@@ -169,6 +255,8 @@ document.addEventListener('DOMContentLoaded', function () {
 				alert('Please enter a Customer ID first.');
 				return;
 			}
+			fetchBtn.disabled = true;
+			fetchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading…';
 			try {
 				const response = await fetch(`/fetch_customer?customer_id=${encodeURIComponent(customerId)}`);
 				const responseText = await response.text();
@@ -193,9 +281,33 @@ document.addEventListener('DOMContentLoaded', function () {
 			} catch (err) {
 				console.error(err);
 				alert(err.message || 'Error fetching customer details.');
+			} finally {
+				fetchBtn.disabled = false;
+				fetchBtn.innerHTML = '<i class="bi bi-search me-1"></i> Fetch';
 			}
 		});
 	}
+
+	// Dark mode toggle
+	const darkToggle = document.getElementById('dark-toggle');
+	const stored = localStorage.getItem('ci-dark-mode');
+	function setThemeToggleState(isDark) {
+		darkToggle.classList.toggle('is-dark', isDark);
+		darkToggle.setAttribute('aria-pressed', String(isDark));
+	}
+	if (stored === 'true') {
+		document.body.classList.add('dark-mode');
+		document.documentElement.classList.add('dark-mode');
+		setThemeToggleState(true);
+	} else {
+		setThemeToggleState(false);
+	}
+	darkToggle.addEventListener('click', () => {
+		const isDark = document.body.classList.toggle('dark-mode');
+		document.documentElement.classList.toggle('dark-mode');
+		setThemeToggleState(isDark);
+		localStorage.setItem('ci-dark-mode', isDark);
+	});
 });
 </script>
 </body>
