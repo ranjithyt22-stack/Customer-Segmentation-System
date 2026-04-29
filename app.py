@@ -1,128 +1,26 @@
-
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-import joblib
+import streamlit as st
 import pandas as pd
+import joblib
 import os
 import io
 import base64
 import importlib
-from src.visualization import generate_dashboard_plots
-from src.interactive_dashboard import generate_interactive_dashboard
 from sklearn.metrics import silhouette_score
 
-
-app = Flask(__name__)
-app.secret_key = 'supersecretkey'
-
-# Load both CLV model variants when available so users can choose at runtime.
-DEEP_CLV_MODEL_PATH = "models/deep_clv_model.keras"
-DEEP_CLV_SCALER_PATH = "models/deep_clv_scaler.pkl"
-CUSTOMER_LOOKUP_CACHE_PATH = "models/customer_lookup.pkl"
-RFM_DASHBOARD_CACHE_PATH = "models/rfm_dashboard_cache.pkl"
-
-deep_clv_available = os.path.exists(DEEP_CLV_MODEL_PATH) and os.path.exists(DEEP_CLV_SCALER_PATH)
-ml_clv_available = True
-deep_clv_model = None
-deep_clv_scaler = None
-ml_clv_model = None
-
-if deep_clv_available:
-    try:
-        deep_clv_scaler = joblib.load(DEEP_CLV_SCALER_PATH)
-    except FileNotFoundError:
-        deep_clv_available = False
-        print("Deep CLV artifacts missing. Deep model option will be unavailable.")
-else:
-    print("Deep CLV artifacts missing. Deep model option will be unavailable.")
-
+# If you still have your src folder, these will work.
+# We will just display the images/html they generate.
 try:
-    ml_clv_model = joblib.load("models/clv_model.pkl")
-except FileNotFoundError:
-    ml_clv_available = False
-    print("ML CLV artifact missing. ML model option will be unavailable.")
+    from src.visualization import generate_dashboard_plots
+    from src.interactive_dashboard import generate_interactive_dashboard
+except ImportError:
+    pass
 
+# --- Streamlit Page Configuration ---
+st.set_page_config(page_title="Textile Customer Segmentation", layout="wide", page_icon="🛍️")
 
-def refresh_deep_model_availability():
-    global deep_clv_available, deep_clv_scaler
-    model_exists = os.path.exists(DEEP_CLV_MODEL_PATH)
-    scaler_exists = os.path.exists(DEEP_CLV_SCALER_PATH)
-    deep_clv_available = model_exists and scaler_exists
-    if deep_clv_available and deep_clv_scaler is None:
-        try:
-            deep_clv_scaler = joblib.load(DEEP_CLV_SCALER_PATH)
-        except FileNotFoundError:
-            deep_clv_available = False
-            print("Deep CLV scaler missing after refresh. Deep model option will be unavailable.")
-    return deep_clv_available
+# --- Constants & Dictionaries ---
+USD_TO_INR = 83
 
-
-def ensure_deep_model_loaded():
-    global deep_clv_model, deep_clv_available
-    if not refresh_deep_model_availability():
-        return False
-    if deep_clv_model is not None:
-        return True
-    try:
-        deep_module = importlib.import_module("src.deep_clv_model")
-        deep_clv_model = deep_module.DeepCLVModel.load(DEEP_CLV_MODEL_PATH)
-        return True
-    except Exception as exc:
-        deep_clv_available = False
-        print(f"Deep CLV model failed to load: {exc}")
-        return False
-
-# --- RFM and Segment Caching ---
-rfm_cache = None
-segment_percentages_cache = None
-total_customers_cache = None
-
-
-def warm_dashboard_cache(force_refresh=False):
-    global rfm_cache, segment_percentages_cache, total_customers_cache
-
-    if rfm_cache is None or force_refresh:
-        rfm = load_rfm_dashboard_cache(force_refresh=force_refresh)
-        if rfm is None:
-            return False
-        rfm_cache = rfm
-        total_customers_cache = len(rfm)
-        segment_counts = rfm['Segment'].value_counts()
-        segment_percentages_cache = {
-            seg: round(100 * count / total_customers_cache, 1)
-            for seg, count in segment_counts.items()
-        }
-
-    # Generate heavy assets once unless explicitly forced
-    needs_assets = (
-        force_refresh
-        or not os.path.exists("static/cluster_plot.png")
-        or not os.path.exists("static/segment_pie.png")
-        or not os.path.exists("static/avg_spending.png")
-        or not os.path.exists("static/cluster_plot_interactive.html")
-        or not os.path.exists("static/segment_pie_interactive.html")
-        or not os.path.exists("static/avg_spending_interactive.html")
-    )
-    if needs_assets and rfm_cache is not None:
-        generate_dashboard_plots(rfm_cache)
-        generate_interactive_dashboard(rfm_cache)
-
-    return rfm_cache is not None
-
-
-def has_interactive_dashboard_assets():
-    return (
-        os.path.exists("static/cluster_plot_interactive.html")
-        and os.path.exists("static/segment_pie_interactive.html")
-        and os.path.exists("static/avg_spending_interactive.html")
-    )
-
-def get_rfm():
-    global rfm_cache
-    if rfm_cache is None:
-        warm_dashboard_cache(force_refresh=False)
-    return rfm_cache
-
-# Strategy recommendations
 strategies = {
     "High Value Customer": "Provide loyalty rewards and premium offers.",
     "Regular Customer": "Offer cross-selling and product bundles.",
@@ -144,159 +42,83 @@ segment_fabric_preferences = {
     "Lost Customer": "Seasonal Mixed Fabrics",
 }
 
-segment_visuals = {
-    "High Value Customer": {
-        "label": "High Value",
-        "theme": "ci-segment-high",
-        "icon": "bi-gem",
-    },
-    "Regular Customer": {
-        "label": "New Customer",
-        "theme": "ci-segment-new",
-        "icon": "bi-gift",
-    },
-    "Occasional Customer": {
-        "label": "At Risk",
-        "theme": "ci-segment-risk",
-        "icon": "bi-hourglass-split",
-    },
-    "Lost Customer": {
-        "label": "Lost",
-        "theme": "ci-segment-lost",
-        "icon": "bi-archive",
-    },
-}
-
-USD_TO_INR = 83  # Approximate conversion for display purposes
-
-
-def build_offer_payload(segment, customer_id):
-    coupon_map = {
-        "High Value Customer": {
-            "title": "Exclusive 20% Off",
-            "subtitle": "Premium Silk Collection",
-            "savings_inr": 1200,
-        },
-        "Regular Customer": {
-            "title": "Fresh Arrival Bonus",
-            "subtitle": "15% off on Cotton and Daily Wear",
-            "savings_inr": 700,
-        },
-        "Occasional Customer": {
-            "title": "We Miss You Offer",
-            "subtitle": "Flat INR 500 off on your next purchase",
-            "savings_inr": 500,
-        },
-        "Lost Customer": {
-            "title": "Comeback Coupon",
-            "subtitle": "Flat INR 500 off on your next purchase",
-            "savings_inr": 500,
-        },
-    }
-    selected = coupon_map.get(
-        segment,
-        {
-            "title": "Special Offer",
-            "subtitle": "Ask cashier for in-store discount",
-            "savings_inr": 300,
-        },
-    )
-    segment_code = "".join([s[0] for s in segment.split()][:3]).upper()
-    customer_part = str(customer_id).replace(" ", "").replace("-", "")[-4:] or "0000"
-    coupon_code = f"{segment_code}{customer_part}26"
-    return {
-        "title": selected["title"],
-        "subtitle": selected["subtitle"],
-        "savings_inr": selected["savings_inr"],
-        "coupon_code": coupon_code,
-    }
-
-
-def build_offer_qr_data_uri(coupon_code):
-    qr_payload = f"TEXTILE-OFFER:{coupon_code}"
-    try:
-        qrcode_module = importlib.import_module("qrcode")
-    except ModuleNotFoundError:
-        return ""
-    qr = qrcode_module.QRCode(version=1, box_size=4, border=1)
-    qr.add_data(qr_payload)
-    qr.make(fit=True)
-    image = qr.make_image(fill_color="black", back_color="white")
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
-
-
-def normalize_rfm_scores(recency, frequency, monetary):
-    recency_score = max(0, min(100, round((180 - recency) / 180 * 100)))
-    frequency_target = max(thresholds["frequency"] * 2, 1)
-    monetary_target = max(thresholds["monetary"] * 2, 1)
-    frequency_score = max(0, min(100, round((frequency / frequency_target) * 100)))
-    monetary_score = max(0, min(100, round((monetary / monetary_target) * 100)))
-    return {
-        "recency": recency_score,
-        "frequency": frequency_score,
-        "monetary": monetary_score,
-    }
-
-
+# --- Caching Data & Models (The Streamlit Way) ---
+@st.cache_data
 def load_clean_dataset():
     try:
         df = pd.read_excel("dataset/Online Retail.xlsx")
+        df = df.dropna(subset=["CustomerID"])
+        df = df[(df["Quantity"] > 0) & (df["UnitPrice"] > 0)].copy()
+        df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
+        df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
+        return df
     except FileNotFoundError:
         return None
-    df = df.dropna(subset=["CustomerID"])
-    df = df[(df["Quantity"] > 0) & (df["UnitPrice"] > 0)].copy()
-    df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
-    df["TotalPrice"] = df["Quantity"] * df["UnitPrice"]
-    return df
 
-
-def compute_rfm(df):
-    snapshot_date = df['InvoiceDate'].max() + pd.Timedelta(days=1)
-    rfm = df.groupby('CustomerID').agg({
-        'InvoiceDate': lambda x: (snapshot_date - x.max()).days,
-        'InvoiceNo': 'nunique',
-        'TotalPrice': 'sum'
-    })
-    rfm.columns = ['Recency','Frequency','Monetary']
-    return rfm
-
-
-def compute_thresholds_from_rfm(rfm):
-    return {
-        "recency": float(rfm['Recency'].quantile(0.75)),
-        "frequency": float(rfm['Frequency'].quantile(0.50)),
-        "monetary": float(rfm['Monetary'].quantile(0.50)),
-    }
-
-
+@st.cache_data
 def load_thresholds():
     try:
         return joblib.load("models/rfm_thresholds.pkl")
     except FileNotFoundError:
         df = load_clean_dataset()
         if df is None:
-            raise FileNotFoundError("Customer dataset not found and thresholds file missing.")
-        rfm = compute_rfm(df)
-        thresholds = compute_thresholds_from_rfm(rfm)
+            # Fallback default thresholds if no data or model exists
+            return {"recency": 90.0, "frequency": 5.0, "monetary": 1000.0}
+        
+        snapshot_date = df['InvoiceDate'].max() + pd.Timedelta(days=1)
+        rfm = df.groupby('CustomerID').agg({
+            'InvoiceDate': lambda x: (snapshot_date - x.max()).days,
+            'InvoiceNo': 'nunique',
+            'TotalPrice': 'sum'
+        })
+        rfm.columns = ['Recency','Frequency','Monetary']
+        
+        thresholds = {
+            "recency": float(rfm['Recency'].quantile(0.75)),
+            "frequency": float(rfm['Frequency'].quantile(0.50)),
+            "monetary": float(rfm['Monetary'].quantile(0.50)),
+        }
         os.makedirs("models", exist_ok=True)
         joblib.dump(thresholds, "models/rfm_thresholds.pkl")
         return thresholds
 
+@st.cache_data
+def get_customer_lookup():
+    df = load_clean_dataset()
+    if df is None:
+        return None
+    summary = df.groupby("CustomerID").agg(
+        first_purchase=("InvoiceDate", "min"),
+        last_purchase=("InvoiceDate", "max"),
+        total_purchases=("InvoiceNo", "nunique"),
+        total_spending=("TotalPrice", "sum"),
+    )
+    summary["first_purchase"] = summary["first_purchase"].dt.normalize()
+    summary["last_purchase"] = summary["last_purchase"].dt.normalize()
+    return summary
+
+# Load globals
+thresholds = load_thresholds()
+customer_lookup = get_customer_lookup()
+
+# --- Helper Functions ---
+def assign_segment(recency, frequency, monetary):
+    if (recency <= thresholds["recency"] and 
+        frequency > thresholds["frequency"] and 
+        monetary > thresholds["monetary"]):
+        return "High Value Customer"
+    if recency > thresholds["recency"]:
+        return "Lost Customer"
+    if frequency > thresholds["frequency"]:
+        return "Regular Customer"
+    return "Occasional Customer"
 
 def calculate_clv(total_spending, total_purchases, first_purchase_date=None, last_purchase_date=None, future_lifespan_years=3.0):
-    """
-    Calculate Customer Lifetime Value (CLV).
-    Total spending reflects past behavior, while CLV estimates future value based on purchasing patterns.
-    """
     if total_purchases == 0:
         return 0.0
-
     avg_purchase_value = total_spending / total_purchases
-
     lifespan_years = 3.0
+    
     if first_purchase_date is not None and last_purchase_date is not None:
         try:
             first_date = pd.to_datetime(first_purchase_date)
@@ -311,424 +133,230 @@ def calculate_clv(total_spending, total_purchases, first_purchase_date=None, las
         lifespan_years = 1.0
 
     purchase_frequency = total_purchases / lifespan_years
-    
     clv = avg_purchase_value * purchase_frequency * future_lifespan_years
-    
-    # Optional Enhancement: Add a 10% multiplier for growth
-    clv *= 1.10
-    
+    clv *= 1.10  # 10% growth multiplier
     return round(clv, 2)
 
+def build_offer_payload(segment, customer_id):
+    customer_part = str(customer_id).replace(" ", "").replace("-", "")[-4:] or "0000"
+    segment_code = "".join([s[0] for s in segment.split()][:3]).upper()
+    coupon_code = f"{segment_code}{customer_part}26"
+    return coupon_code
 
-def load_customer_lookup():
-    dataset_path = "dataset/Online Retail.xlsx"
-    if os.path.exists(CUSTOMER_LOOKUP_CACHE_PATH) and os.path.exists(dataset_path):
-        cache_is_fresh = os.path.getmtime(CUSTOMER_LOOKUP_CACHE_PATH) >= os.path.getmtime(dataset_path)
-        if cache_is_fresh:
+def generate_qr_code(coupon_code):
+    qr_payload = f"TEXTILE-OFFER:{coupon_code}"
+    try:
+        qrcode_module = importlib.import_module("qrcode")
+        qr = qrcode_module.QRCode(version=1, box_size=4, border=1)
+        qr.add_data(qr_payload)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except ModuleNotFoundError:
+        return None
+
+# --- Session State for Login ---
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# --- App Routing & UI ---
+if not st.session_state["logged_in"]:
+    st.title("🔒 Login")
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Login")
+        
+        if submitted:
+            if username == "admin" and password == "admin":
+                st.session_state["logged_in"] = True
+                st.rerun()
+            else:
+                st.error("Invalid credentials. Use admin / admin.")
+else:
+    # Sidebar Navigation
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Predict Offer", "Dashboard", "Customer Evolution", "Upload Data"])
+    
+    st.sidebar.markdown("---")
+    if st.sidebar.button("Logout"):
+        st.session_state["logged_in"] = False
+        st.rerun()
+
+    # --- Predict Module ---
+    if page == "Predict Offer":
+        st.title("🎯 Customer Prediction & Offers")
+        
+        # Simple Fetch Mechanism
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            fetch_id = st.text_input("Fetch Existing Customer Data (Enter ID):")
+        with col2:
+            st.write("") # Spacing
+            st.write("")
+            fetch_clicked = st.button("Fetch")
+
+        # Defaults for form
+        def_id = ""
+        def_date = pd.Timestamp.today().date()
+        def_purchases = 0.0
+        def_spending = 0.0
+        def_first_purchase = None
+
+        if fetch_clicked and fetch_id and customer_lookup is not None:
             try:
-                summary = joblib.load(CUSTOMER_LOOKUP_CACHE_PATH)
-                if "first_purchase" in summary.columns:
-                    return summary
-            except Exception as exc:
-                print(f"Customer lookup cache could not be loaded and will be rebuilt: {exc}")
+                numeric_id = float(fetch_id)
+                if numeric_id in customer_lookup.index:
+                    record = customer_lookup.loc[numeric_id]
+                    def_id = str(fetch_id)
+                    def_date = record["last_purchase"].date()
+                    def_purchases = float(record["total_purchases"])
+                    def_spending = float(record["total_spending"])
+                    def_first_purchase = record["first_purchase"]
+                    st.success(f"Loaded data for Customer {fetch_id}")
+                else:
+                    st.warning("Customer ID not found in dataset.")
+            except ValueError:
+                st.error("Invalid ID format.")
 
-    df = load_clean_dataset()
-    if df is None:
-        print("Customer dataset not found. Fetch endpoint will be unavailable.")
-        return None
-    summary = df.groupby("CustomerID").agg(
-        first_purchase=("InvoiceDate", "min"),
-        last_purchase=("InvoiceDate", "max"),
-        total_purchases=("InvoiceNo", "nunique"),
-        total_spending=("TotalPrice", "sum"),
-    )
-    summary["first_purchase"] = summary["first_purchase"].dt.normalize()
-    summary["last_purchase"] = summary["last_purchase"].dt.normalize()
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(summary, CUSTOMER_LOOKUP_CACHE_PATH)
-    return summary
-
-
-def load_rfm_dashboard_cache(force_refresh=False):
-    dataset_path = "dataset/Online Retail.xlsx"
-    if (
-        not force_refresh
-        and os.path.exists(RFM_DASHBOARD_CACHE_PATH)
-        and os.path.exists(dataset_path)
-        and os.path.getmtime(RFM_DASHBOARD_CACHE_PATH) >= os.path.getmtime(dataset_path)
-    ):
-        try:
-            return joblib.load(RFM_DASHBOARD_CACHE_PATH)
-        except Exception as exc:
-            print(f"RFM dashboard cache could not be loaded and will be rebuilt: {exc}")
-
-    customer_summary = load_customer_lookup()
-    if customer_summary is not None:
-        snapshot_date = customer_summary["last_purchase"].max() + pd.Timedelta(days=1)
-        rfm = pd.DataFrame(index=customer_summary.index)
-        rfm["Recency"] = (snapshot_date - customer_summary["last_purchase"]).dt.days
-        rfm["Frequency"] = customer_summary["total_purchases"]
-        rfm["Monetary"] = customer_summary["total_spending"]
-    else:
-        df = load_clean_dataset()
-        if df is None:
-            return None
-        rfm = compute_rfm(df)
-
-    rfm["Segment"] = rfm.apply(
-        lambda row: assign_segment(row["Recency"], row["Frequency"], row["Monetary"]),
-        axis=1
-    )
-    os.makedirs("models", exist_ok=True)
-    joblib.dump(rfm, RFM_DASHBOARD_CACHE_PATH)
-    return rfm
-
-
-customer_lookup = None
-customer_lookup_by_id = None
-dataset_reference_date = pd.Timestamp.today().normalize()
-thresholds = load_thresholds()
-
-
-def ensure_customer_lookup_loaded():
-    global customer_lookup, customer_lookup_by_id, dataset_reference_date
-    if customer_lookup is None:
-        customer_lookup = load_customer_lookup()
-        if customer_lookup is not None:
-            dataset_reference_date = customer_lookup["last_purchase"].max() + pd.Timedelta(days=1)
-            customer_lookup_by_id = {
-                normalize_customer_id(customer_id): record
-                for customer_id, record in customer_lookup.iterrows()
-            }
-    return customer_lookup
-
-
-def normalize_customer_id(value):
-    raw = str(value).strip()
-    if not raw:
-        return None
-    try:
-        numeric = float(raw)
-    except ValueError:
-        return None
-    if numeric.is_integer():
-        return str(int(numeric))
-    return str(numeric)
-
-
-def assign_segment(recency, frequency, monetary):
-    if (
-        recency <= thresholds["recency"]
-        and frequency > thresholds["frequency"]
-        and monetary > thresholds["monetary"]
-    ):
-        return "High Value Customer"
-    if recency > thresholds["recency"]:
-        return "Lost Customer"
-    if frequency > thresholds["frequency"]:
-        return "Regular Customer"
-    return "Occasional Customer"
-
-
-@app.route("/predict", methods=["GET", "POST"])
-def predict():
-    if not session.get("logged_in"):
-        flash("Please log in to access the Predict module.")
-        return redirect(url_for("login"))
-
-    if request.method == "GET":
-        refresh_deep_model_availability()
-        return render_template(
-            "index.html",
-            model_selected="auto",
-            deep_clv_available=deep_clv_available,
-            ml_clv_available=ml_clv_available,
-            prediction_count=session.get("prediction_count", 0)
-        )
-
-    # Automatic RFM calculation from user-friendly input
-    customer_id = request.form["customer_id"]
-    last_purchase = request.form["last_purchase"]
-    total_purchases = float(request.form["total_purchases"])
-    total_spending = float(request.form["total_spending"])
-    last_purchase_date = pd.to_datetime(last_purchase)
-    if ensure_customer_lookup_loaded() is not None:
-        reference_date = dataset_reference_date
-    else:
-        reference_date = pd.Timestamp.today().normalize()
-    recency = max((reference_date - last_purchase_date).days, 0)
-    frequency = total_purchases
-    monetary = total_spending
-    segment = assign_segment(recency, frequency, monetary)
-    strategy = strategies.get(segment, "No strategy available.")
-    offer_badge = segment_offer_badges.get(segment, "Special in-store offer available")
-    preferred_fabric = segment_fabric_preferences.get(segment, "General Fabrics")
-    rfm_scores = normalize_rfm_scores(recency, frequency, monetary)
-    segment_ui = segment_visuals.get(
-        segment,
-        {"label": segment, "theme": "ci-segment-new", "icon": "bi-person"},
-    )
-    offer = build_offer_payload(segment, customer_id)
-    offer_qr_data = build_offer_qr_data_uri(offer["coupon_code"])
-    model_selected = request.form.get("model_choice", "auto")
-    prediction_count = session.get("prediction_count", 0) + 1
-    session["prediction_count"] = prediction_count
-
-    # Try to extract first purchase date
-    normalized_id = normalize_customer_id(customer_id)
-    first_purchase = None
-    if ensure_customer_lookup_loaded() is not None and customer_lookup_by_id:
-        record = customer_lookup_by_id.get(normalized_id)
-        if record is not None and "first_purchase" in record:
-            first_purchase = record["first_purchase"]
-
-    # Calculate analytical CLV instead of relying on the ML model
-    clv_usd = calculate_clv(
-        total_spending=total_spending,
-        total_purchases=total_purchases,
-        first_purchase_date=first_purchase,
-        last_purchase_date=last_purchase_date
-    )
-    model_used = "Analytical CLV Formula"
-
-    clv_inr = clv_usd * USD_TO_INR
-    return render_template(
-        "index.html",
-        result=segment,
-        r=recency,
-        f=frequency,
-        m=monetary,
-        strategy=strategy,
-        offer_badge=offer_badge,
-        preferred_fabric=preferred_fabric,
-        recency_score=rfm_scores["recency"],
-        rfm_scores=rfm_scores,
-        offer=offer,
-        offer_qr_data=offer_qr_data,
-        segment_label=segment_ui["label"],
-        segment_theme=segment_ui["theme"],
-        segment_icon=segment_ui["icon"],
-        total_spending=total_spending,
-        clv_usd=clv_usd,
-        clv_inr=clv_inr,
-        model_used=model_used,
-        model_selected=model_selected,
-        deep_clv_available=deep_clv_available,
-        ml_clv_available=ml_clv_available,
-        prediction_count=prediction_count
-    )
-
-
-@app.route("/fetch_customer", methods=["GET"])
-def fetch_customer():
-    customer_id = request.args.get("customer_id", "").strip()
-    if not customer_id:
-        return jsonify({"success": False, "message": "Customer ID is required."}), 400
-
-    normalized_id = normalize_customer_id(customer_id)
-    if normalized_id is None:
-        return jsonify({"success": False, "message": "Invalid Customer ID format."}), 400
-
-    if ensure_customer_lookup_loaded() is None:
-        return jsonify({"success": False, "message": "Customer dataset not available on server."}), 500
-
-    try:
-        record = customer_lookup_by_id.get(normalized_id) if customer_lookup_by_id else None
-        if record is None:
-            return jsonify({"success": False, "message": "Customer ID not found in dataset."}), 404
-
-        last_purchase_date = pd.to_datetime(record["last_purchase"]).date().isoformat()
-        total_purchases = int(record["total_purchases"])
-        total_spending = float(record["total_spending"])
-    except Exception as exc:
-        print(f"Fetch customer failed for ID {customer_id}: {exc}")
-        return jsonify({"success": False, "message": "Failed to fetch customer history."}), 500
-
-    return jsonify(
-        {
-            "success": True,
-            "customer_id": customer_id,
-            "last_purchase": last_purchase_date,
-            "total_purchases": total_purchases,
-            "total_spending": round(total_spending, 2),
-        }
-    )
-
-
-@app.route("/", methods=["GET", "POST"])
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if session.get("logged_in"):
-        return redirect(url_for("predict"))
-        
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        if username == "admin" and password == "admin":
-            session["logged_in"] = True
-            return redirect(url_for("predict"))
-        else:
-            flash("Invalid credentials. Use admin / admin.")
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    session.pop("logged_in", None)
-    return redirect(url_for("login"))
-
-
-@app.route("/dashboard")
-def dashboard():
-    if not session.get("logged_in"):
-        flash("Please log in to access the Analytics Dashboard.")
-        return redirect(url_for("login"))
-
-    ready = warm_dashboard_cache(force_refresh=False)
-    if not ready:
-        flash("Customer dataset not available.")
-        return redirect(url_for("predict"))
-
-    interactive_available = has_interactive_dashboard_assets()
-
-    return render_template(
-        "dashboard.html",
-        total_customers=total_customers_cache,
-        segment_percentages=segment_percentages_cache,
-        interactive=interactive_available
-    )
-
-
-@app.route("/calculator")
-def calculator():
-    if not session.get("logged_in"):
-        flash("Please log in to access the CLV Calculator.")
-        return redirect(url_for("login"))
-    return render_template("calculator.html")
-
-
-@app.route("/evolution")
-def evolution():
-    if not session.get("logged_in"):
-        flash("Please log in to access the Evolution Timeline.")
-        return redirect(url_for("login"))
-    return render_template("evolution.html")
-
-df_cache = None
-
-def get_cached_dataset():
-    global df_cache
-    if df_cache is None:
-        df_cache = load_clean_dataset()
-    return df_cache
-
-@app.route("/api/evolution/<int:customer_id>")
-def api_evolution(customer_id):
-    if not session.get("logged_in"):
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    df = get_cached_dataset()
-    if df is None:
-        return jsonify({"error": "Dataset missing"}), 500
-        
-    cust_df = df[df["CustomerID"] == customer_id].copy()
-    if cust_df.empty:
-        return jsonify({"error": "Customer not found"}), 404
-        
-    cust_df = cust_df.sort_values("InvoiceDate")
-    cust_df["Month"] = cust_df["InvoiceDate"].dt.to_period('M')
-    
-    monthly_data = []
-    months = sorted(cust_df["Month"].unique())
-    cum_spending = 0
-    cum_purchases = 0
-    first_purchase = cust_df["InvoiceDate"].min()
-    
-    for m in months:
-        m_df = cust_df[cust_df["Month"] == m]
-        cum_spending += (m_df["Quantity"] * m_df["UnitPrice"]).sum()
-        cum_purchases += m_df["InvoiceNo"].nunique()
-        last_purchase_up_to_m = m_df["InvoiceDate"].max()
-        
-        # calculate CLV
-        clv = calculate_clv(cum_spending, cum_purchases, first_purchase, last_purchase_up_to_m)
-        
-        # Scale CLV roughly if it's too small for the user's requested thresholds (100k, 300k)
-        # The dataset is UK retail (pounds), max CLV is usually 10k-50k. 
-        # Convert to INR by multiplying by 83, and maybe boost it to look realistic for the requested thresholds.
-        clv_inr = clv * USD_TO_INR * 5  # Boost factor so it hits Medium/High segments for some customers
-        
-        if clv_inr < 100000:
-            segment = "Low"
-        elif clv_inr <= 300000:
-            segment = "Medium"
-        else:
-            segment = "High"
+        with st.form("prediction_form"):
+            customer_id = st.text_input("Customer ID", value=def_id)
+            last_purchase = st.date_input("Last Purchase Date", value=def_date)
+            total_purchases = st.number_input("Total Purchases", min_value=0.0, value=def_purchases)
+            total_spending = st.number_input("Total Spending", min_value=0.0, value=def_spending)
             
-        monthly_data.append({
-            "month": m.strftime('%b %Y'),
-            "clv": round(clv_inr, 2),
-            "segment": segment
-        })
+            submit = st.form_submit_button("Analyze Customer")
+
+        if submit:
+            # RFM Calculations
+            reference_date = pd.Timestamp.today().normalize()
+            if customer_lookup is not None:
+                reference_date = customer_lookup["last_purchase"].max() + pd.Timedelta(days=1)
+                
+            recency = max((reference_date - pd.to_datetime(last_purchase)).days, 0)
+            segment = assign_segment(recency, total_purchases, total_spending)
+            
+            clv_usd = calculate_clv(total_spending, total_purchases, def_first_purchase, pd.to_datetime(last_purchase))
+            clv_inr = clv_usd * USD_TO_INR
+
+            st.markdown("---")
+            st.subheader(f"Segment: {segment}")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Recency (Days)", f"{recency:.0f}")
+            c2.metric("Frequency", f"{total_purchases:.0f}")
+            c3.metric("Monetary", f"₹ {total_spending:,.2f}")
+            c4.metric("Est. CLV", f"₹ {clv_inr:,.2f}")
+
+            st.info(f"**Strategy:** {strategies.get(segment, 'N/A')}")
+            st.success(f"**Offer:** {segment_offer_badges.get(segment, 'Standard Offer')}")
+            st.text(f"**Preferred Fabric:** {segment_fabric_preferences.get(segment, 'Mixed')}")
+            
+            # QR Code Generation
+            coupon_code = build_offer_payload(segment, customer_id)
+            st.write(f"**Coupon Code:** `{coupon_code}`")
+            
+            qr_bytes = generate_qr_code(coupon_code)
+            if qr_bytes:
+                st.image(qr_bytes, caption="Scan Offer at Counter", width=150)
+
+
+    # --- Dashboard Module ---
+    elif page == "Dashboard":
+        st.title("📊 Analytics Dashboard")
         
-    return jsonify({"data": monthly_data})
+        df = load_clean_dataset()
+        if df is not None:
+            st.write(f"**Total Valid Transactions:** {len(df):,}")
+            
+            # If your custom src scripts successfully rendered plots to /static, we can show them
+            st.subheader("Visualizations")
+            col1, col2 = st.columns(2)
+            
+            if os.path.exists("static/segment_pie.png"):
+                col1.image("static/segment_pie.png", caption="Segment Distribution")
+            else:
+                col1.info("Pie chart not generated yet. Ensure `src.visualization` is working.")
+                
+            if os.path.exists("static/cluster_plot.png"):
+                col2.image("static/cluster_plot.png", caption="Customer Clusters")
+
+            if os.path.exists("static/segment_pie_interactive.html"):
+                st.components.v1.html(open("static/segment_pie_interactive.html", 'r').read(), height=400)
+        else:
+            st.warning("Customer dataset not available on the server. Please upload data.")
 
 
-# CSV upload route
-@app.route("/upload", methods=["GET", "POST"])
-def upload():
-    if request.method == "POST":
-        file = request.files["file"]
-        if not file:
-            flash("No file uploaded.")
-            return redirect(request.url)
-        df = pd.read_csv(file)
-        # Minimal cleaning for demo
-        if 'CustomerID' not in df.columns:
-            flash("CSV must contain CustomerID column.")
-            return redirect(request.url)
-        df = df.dropna(subset=['CustomerID'])
-        if 'InvoiceDate' in df.columns:
-            df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'])
-        if 'Quantity' in df.columns and 'UnitPrice' in df.columns:
-            df['TotalPrice'] = df['Quantity'] * df['UnitPrice']
-        global rfm_cache, total_customers_cache, segment_percentages_cache
-        rfm = compute_rfm(df)
-        rfm['Segment'] = rfm.apply(
-            lambda row: assign_segment(row['Recency'], row['Frequency'], row['Monetary']),
-            axis=1
-        )
-        rfm_cache = rfm
-        total_customers_cache = len(rfm)
-        segment_counts = rfm['Segment'].value_counts()
-        segment_percentages_cache = {seg: round(100*count/total_customers_cache,1) for seg, count in segment_counts.items()}
-        generate_dashboard_plots(rfm)
-        generate_interactive_dashboard(rfm)
-        interactive_available = has_interactive_dashboard_assets()
-        return render_template(
-            "dashboard.html",
-            total_customers=total_customers_cache,
-            segment_percentages=segment_percentages_cache,
-            interactive=interactive_available
-        )
-    return render_template("upload.html")
+    # --- Evolution Module ---
+    elif page == "Customer Evolution":
+        st.title("📈 Customer Evolution Timeline")
+        
+        cust_id = st.text_input("Enter Customer ID for Timeline:")
+        if st.button("Generate Timeline") and cust_id:
+            df = load_clean_dataset()
+            if df is None:
+                st.error("Dataset missing")
+            else:
+                try:
+                    numeric_id = float(cust_id)
+                    cust_df = df[df["CustomerID"] == numeric_id].copy()
+                    
+                    if cust_df.empty:
+                        st.warning("Customer not found in dataset.")
+                    else:
+                        cust_df = cust_df.sort_values("InvoiceDate")
+                        cust_df["Month"] = cust_df["InvoiceDate"].dt.to_period('M')
+                        
+                        months = sorted(cust_df["Month"].unique())
+                        cum_spending = 0
+                        cum_purchases = 0
+                        first_purchase = cust_df["InvoiceDate"].min()
+                        
+                        timeline_data = []
+                        
+                        for m in months:
+                            m_df = cust_df[cust_df["Month"] == m]
+                            cum_spending += (m_df["Quantity"] * m_df["UnitPrice"]).sum()
+                            cum_purchases += m_df["InvoiceNo"].nunique()
+                            last_p = m_df["InvoiceDate"].max()
+                            
+                            clv = calculate_clv(cum_spending, cum_purchases, first_purchase, last_p)
+                            clv_inr = clv * USD_TO_INR * 5 # Applying your boost factor
+                            
+                            if clv_inr < 100000:
+                                seg = "Low"
+                            elif clv_inr <= 300000:
+                                seg = "Medium"
+                            else:
+                                seg = "High"
+                                
+                            timeline_data.append({
+                                "Month": m.strftime('%b %Y'),
+                                "Est. CLV (INR)": round(clv_inr, 2),
+                                "Segment": seg
+                            })
+                            
+                        timeline_df = pd.DataFrame(timeline_data)
+                        st.dataframe(timeline_df, use_container_width=True)
+                        st.line_chart(timeline_df.set_index("Month")["Est. CLV (INR)"])
+                        
+                except ValueError:
+                    st.error("Invalid Customer ID")
 
 
-# Model evaluation metrics (print at startup)
-def print_model_metrics():
-    df = load_clean_dataset()
-    if df is None:
-        print("Customer dataset not found; cannot compute metrics.")
-        return
-    cluster_model = joblib.load("models/kmeans_model.pkl")
-    cluster_scaler = joblib.load("models/scaler.pkl")
-    rfm = compute_rfm(df)
-    rfm_scaled = cluster_scaler.transform(rfm)
-    clusters = cluster_model.predict(rfm_scaled)
-    sil_score = silhouette_score(rfm_scaled, clusters)
-    print("Silhouette Score:", sil_score)
-    print("Inertia:", cluster_model.inertia_)
-    print("Cluster Distribution:", pd.Series(clusters).value_counts().to_dict())
-
-'''if __name__ == "__main__":
-    app.run(debug=True, use_reloader=True)'''
+    # --- Upload Module ---
+    elif page == "Upload Data":
+        st.title("📁 Upload New Dataset")
+        
+        uploaded_file = st.file_uploader("Upload CSV or Excel file", type=['csv', 'xlsx'])
+        if uploaded_file is not None:
+            st.info("File uploaded successfully. In a production environment, you would add logic here to save this over `dataset/Online Retail.xlsx` and clear the Streamlit caches using `st.cache_data.clear()`.")
+            # Example of how you would load it to preview:
+            if uploaded_file.name.endswith('.csv'):
+                preview = pd.read_csv(uploaded_file).head()
+            else:
+                preview = pd.read_excel(uploaded_file).head()
+            st.dataframe(preview)
