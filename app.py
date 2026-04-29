@@ -17,6 +17,8 @@ app.secret_key = 'supersecretkey'
 # Load both CLV model variants when available so users can choose at runtime.
 DEEP_CLV_MODEL_PATH = "models/deep_clv_model.keras"
 DEEP_CLV_SCALER_PATH = "models/deep_clv_scaler.pkl"
+CUSTOMER_LOOKUP_CACHE_PATH = "models/customer_lookup.pkl"
+RFM_DASHBOARD_CACHE_PATH = "models/rfm_dashboard_cache.pkl"
 
 deep_clv_available = os.path.exists(DEEP_CLV_MODEL_PATH) and os.path.exists(DEEP_CLV_SCALER_PATH)
 ml_clv_available = True
@@ -79,14 +81,9 @@ def warm_dashboard_cache(force_refresh=False):
     global rfm_cache, segment_percentages_cache, total_customers_cache
 
     if rfm_cache is None or force_refresh:
-        df = load_clean_dataset()
-        if df is None:
+        rfm = load_rfm_dashboard_cache(force_refresh=force_refresh)
+        if rfm is None:
             return False
-        rfm = compute_rfm(df)
-        rfm['Segment'] = rfm.apply(
-            lambda row: assign_segment(row['Recency'], row['Frequency'], row['Monetary']),
-            axis=1
-        )
         rfm_cache = rfm
         total_customers_cache = len(rfm)
         segment_counts = rfm['Segment'].value_counts()
@@ -290,6 +287,15 @@ def load_thresholds():
 
 
 def load_customer_lookup():
+    dataset_path = "dataset/Online Retail.xlsx"
+    if os.path.exists(CUSTOMER_LOOKUP_CACHE_PATH) and os.path.exists(dataset_path):
+        cache_is_fresh = os.path.getmtime(CUSTOMER_LOOKUP_CACHE_PATH) >= os.path.getmtime(dataset_path)
+        if cache_is_fresh:
+            try:
+                return joblib.load(CUSTOMER_LOOKUP_CACHE_PATH)
+            except Exception as exc:
+                print(f"Customer lookup cache could not be loaded and will be rebuilt: {exc}")
+
     df = load_clean_dataset()
     if df is None:
         print("Customer dataset not found. Fetch endpoint will be unavailable.")
@@ -300,20 +306,62 @@ def load_customer_lookup():
         total_spending=("TotalPrice", "sum"),
     )
     summary["last_purchase"] = summary["last_purchase"].dt.normalize()
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(summary, CUSTOMER_LOOKUP_CACHE_PATH)
     return summary
 
 
+def load_rfm_dashboard_cache(force_refresh=False):
+    dataset_path = "dataset/Online Retail.xlsx"
+    if (
+        not force_refresh
+        and os.path.exists(RFM_DASHBOARD_CACHE_PATH)
+        and os.path.exists(dataset_path)
+        and os.path.getmtime(RFM_DASHBOARD_CACHE_PATH) >= os.path.getmtime(dataset_path)
+    ):
+        try:
+            return joblib.load(RFM_DASHBOARD_CACHE_PATH)
+        except Exception as exc:
+            print(f"RFM dashboard cache could not be loaded and will be rebuilt: {exc}")
+
+    customer_summary = load_customer_lookup()
+    if customer_summary is not None:
+        snapshot_date = customer_summary["last_purchase"].max() + pd.Timedelta(days=1)
+        rfm = pd.DataFrame(index=customer_summary.index)
+        rfm["Recency"] = (snapshot_date - customer_summary["last_purchase"]).dt.days
+        rfm["Frequency"] = customer_summary["total_purchases"]
+        rfm["Monetary"] = customer_summary["total_spending"]
+    else:
+        df = load_clean_dataset()
+        if df is None:
+            return None
+        rfm = compute_rfm(df)
+
+    rfm["Segment"] = rfm.apply(
+        lambda row: assign_segment(row["Recency"], row["Frequency"], row["Monetary"]),
+        axis=1
+    )
+    os.makedirs("models", exist_ok=True)
+    joblib.dump(rfm, RFM_DASHBOARD_CACHE_PATH)
+    return rfm
+
+
 customer_lookup = None
+customer_lookup_by_id = None
 dataset_reference_date = pd.Timestamp.today().normalize()
 thresholds = load_thresholds()
 
 
 def ensure_customer_lookup_loaded():
-    global customer_lookup, dataset_reference_date
+    global customer_lookup, customer_lookup_by_id, dataset_reference_date
     if customer_lookup is None:
         customer_lookup = load_customer_lookup()
         if customer_lookup is not None:
             dataset_reference_date = customer_lookup["last_purchase"].max() + pd.Timedelta(days=1)
+            customer_lookup_by_id = {
+                normalize_customer_id(customer_id): record
+                for customer_id, record in customer_lookup.iterrows()
+            }
     return customer_lookup
 
 
@@ -468,7 +516,6 @@ def predict():
 
 @app.route("/fetch_customer", methods=["GET"])
 def fetch_customer():
-    global customer_lookup
     customer_id = request.args.get("customer_id", "").strip()
     if not customer_id:
         return jsonify({"success": False, "message": "Customer ID is required."}), 400
@@ -481,13 +528,10 @@ def fetch_customer():
         return jsonify({"success": False, "message": "Customer dataset not available on server."}), 500
 
     try:
-        lookup = customer_lookup.copy()
-        lookup["CustomerIDKey"] = lookup.index.to_series().apply(normalize_customer_id)
-        matches = lookup[lookup["CustomerIDKey"] == normalized_id]
-        if matches.empty:
+        record = customer_lookup_by_id.get(normalized_id) if customer_lookup_by_id else None
+        if record is None:
             return jsonify({"success": False, "message": "Customer ID not found in dataset."}), 404
 
-        record = matches.iloc[0]
         last_purchase_date = pd.to_datetime(record["last_purchase"]).date().isoformat()
         total_purchases = int(record["total_purchases"])
         total_spending = float(record["total_spending"])

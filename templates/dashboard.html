@@ -125,7 +125,7 @@
                 <div class="card card-soft chart-card p-3 h-100">
                     <h5 class="section-title"><i class="bi bi-bullseye"></i>Cluster Scatter Plot</h5>
                     {% if interactive %}
-                    <iframe src="/static/cluster_plot_interactive.html" height="400"></iframe>
+                    <iframe src="/static/cluster_plot_interactive.html" height="400" loading="lazy"></iframe>
                     {% else %}
                     <img src="/static/cluster_plot.png" alt="Cluster plot" class="img-fluid">
                     {% endif %}
@@ -135,7 +135,7 @@
                 <div class="card card-soft chart-card p-3 h-100">
                     <h5 class="section-title"><i class="bi bi-pie-chart-fill"></i>Segment Distribution</h5>
                     {% if interactive %}
-                    <iframe src="/static/segment_pie_interactive.html" height="400"></iframe>
+                    <iframe src="/static/segment_pie_interactive.html" height="400" loading="lazy"></iframe>
                     {% else %}
                     <img src="/static/segment_pie.png" alt="Segment distribution" class="img-fluid">
                     {% endif %}
@@ -148,7 +148,7 @@
                 <div class="card card-soft chart-card p-3 h-100">
                     <h5 class="section-title"><i class="bi bi-cash-coin"></i>Average Spending per Segment</h5>
                     {% if interactive %}
-                    <iframe src="/static/avg_spending_interactive.html" height="400"></iframe>
+                    <iframe src="/static/avg_spending_interactive.html" height="400" loading="lazy"></iframe>
                     {% else %}
                     <img src="/static/avg_spending.png" alt="Average spending" class="img-fluid">
                     {% endif %}
